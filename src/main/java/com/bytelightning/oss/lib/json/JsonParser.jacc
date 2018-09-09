@@ -1,0 +1,144 @@
+%package com.bytelightning.oss.lib.json
+
+// Generate this with: 
+//			java -jar /Developer/CodeLibs/pdx.edu/jacc/jacc.jar src/com/bytelightning/opensource/json/JsonParser.jacc
+//
+%{
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@SuppressWarnings("unchecked")
+%}
+
+%class JsonParser
+%interface JsonTokens
+%get lexer.currentToken()
+%next lexer.nextToken()
+%semantic Object: lexer.getSemantic()
+
+%token STRING
+%token INTEGER
+%token FLOAT
+%token TRUE
+%token FALSE
+%token NULL
+%token LBRACE LBRACKET COLON COMMA RBRACE RBRACKET
+
+%start JsonVal
+
+%%
+JsonMap				: LBRACE JsonMapValListOpt RBRACE		{$$ = ($2 == null) ? makeMap() : $2; }
+					;
+JsonMapValListOpt	:										{$$ = null; }
+					| JsonMapValList						{$$ = $1; }
+					;
+JsonMapValList		: JsonMapVal							{$$ = makeMap();  putProperty((Map<String,Object>)$$, (String)((Object[])$1)[0], ((Object[])$1)[1]); }
+					| JsonMapValList COMMA JsonMapVal		{$$ = ($1 == null) ? makeMap() : $1; putProperty((Map<String,Object>)$$, (String)((Object[])$3)[0], ((Object[])$3)[1]); }
+					;
+JsonMapVal			: STRING COLON JsonVal					{Object[] tuple={$1,$3}; $$=tuple; }	
+					;
+JsonArray			: LBRACKET JsonArrayValListOpt RBRACKET	{$$ = generateNativeArrays ? ((List<Object>)$2).toArray() : $2; }
+					;
+JsonArrayValListOpt :										{$$ = makeList(); }
+					| JsonArrayValList						{$$ = $1; }
+					;
+JsonArrayValList	: JsonVal								{$$ = makeList(); addElement((List<Object>)$$, $1); }
+					| JsonArrayValList COMMA JsonVal		{$$ = ($1 == null) ? makeList() : ensureList($1); addElement((List<Object>)$$, $3); }
+					;
+JsonVal				: JsonMap								{$$ = $1; }
+					| JsonArray								{$$ = $1; }
+					| STRING								{$$ = JsonUtils.UnEscapeJsonString((String)$1); }
+					| FLOAT									{$$ = $1; }
+					| INTEGER								{$$ = $1; if (! distinguishIntegers) $$ = convertIntToFloat($$); }
+					| TRUE									{$$ = $1; }
+					| FALSE									{$$ = $1; }
+					| NULL									{$$ = $1; }
+					;
+%%
+	protected Map<String,Object> makeMap() {
+		return new HashMap<String,Object>();
+	}
+	protected List<Object> makeList() {
+		return new ArrayList<Object>();
+	}
+	protected Object makeInteger(String txt) {
+		return Long.valueOf(txt);
+	}
+	protected Object makeFloat(String txt) {
+		return Double.valueOf(txt);
+	}
+	protected Object convertIntToFloat(Object i) {
+		return ((Long)i).doubleValue();
+	}
+	protected void putProperty(Map<String,Object> obj, String key, Object value) {
+		obj.put(internKeys ? key.intern() : key, value);
+	}
+	protected void addElement(List<Object> list, Object elem) {
+		list.add(elem);
+	}
+	private List<Object> ensureList(Object obj) {
+		if (obj instanceof List<?>)
+			return (List<Object>)obj;
+		else {
+			List<Object> retVal = makeList();
+			retVal.add(obj);
+			return retVal;
+		}
+	}
+
+	protected void yyerror(String msg) {
+		System.err.println(msg + " at position " + lexer.getPosition());
+	}
+
+	public Object parse(java.io.Reader in) throws IOException {
+		if (lexer == null)
+			lexer = new JsonLexer(in) {
+				protected Object makeIntegerSem(String txt) {
+					return makeInteger(txt);
+				}
+				protected Object makeFloatSem(String txt) {
+					return makeFloat(txt);
+				}
+			};
+		else
+			lexer.reset(in);
+		if (parse())
+			return yyrv;
+		return null;
+	}
+	public Object parse(String in) throws IOException {
+		return parse(new java.io.StringReader(in));
+	}
+
+	/**
+	 * Creates a new parser.
+	 */
+	public JsonParser(boolean internKeys, boolean distinguishIntegers, boolean generateNativeArrays) {
+		this.lexer = null;
+		this.internKeys = internKeys;
+		this.distinguishIntegers = distinguishIntegers;
+		this.generateNativeArrays = generateNativeArrays;
+	}
+	public JsonParser() {
+		this(false, false, false);
+	}
+	private final boolean internKeys;
+	private final boolean distinguishIntegers;
+	private final boolean generateNativeArrays;
+	protected JsonLexer lexer;
+	
+	public static void main(String[] args) {
+		try {
+			JsonParser parser = new JsonParser(true, true, false);
+			for (String arg : args) {
+				Object result = parser.parse(arg);
+				System.out.println(result);
+			}
+		}
+		catch (Throwable t) {
+			t.printStackTrace(System.err);
+		}
+	}
