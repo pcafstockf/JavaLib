@@ -3,7 +3,7 @@ General purposes tool bag of classes that I've personally found useful over the 
 Your mileage may vary :-)
 
 As noted in the License.txt file...
-Files in this library are Copyright (c) 2014 Frank Stock and published under the 
+Files in this library are Copyright (c) 2014 Byte Lightning and published under the 
 MIT License *UNLESS* otherwise noted in an individual package and/or file.
 NOTE that in some cases licenses and notices are at the package level (of the files).
 
