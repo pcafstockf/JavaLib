@@ -1,6 +1,21 @@
-MIT License
+NOTICE:
+Files in this library are Copyright (c) 2014 Frank Stock and published under the 
+MIT License *UNLESS* otherwise noted in an individual package and/or file.
+NOTE: The license, and/or notices for some files are in their immediate package.
 
-Copyright (c) 2018 Frank Stock
+Some files were extracted from other open source libraries (such as Grizzly), 
+magazine articles (such as DDJ), Stack Overflow, etc.
+
+The below (MIT) license applies to all packages / files of this project which
+ do not explicitly declare their own license / copyright.
+
+-------------------------------------------------------------
+
+The MIT License (MIT)
+
+ByteLightning Open Source Java library
+
+Copyright (c) 2014 Frank Stock
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
