@@ -1,4 +1,4 @@
-package com.bytelightning.opensource.json;
+package com.bytelightning.oss.lib.json;
 
 import java.io.IOException;
 import java.util.ArrayList;
