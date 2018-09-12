@@ -1,6 +1,7 @@
 package com.bytelightning.oss.lib.http;
 
 import org.apache.http.*;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.CookieStore;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.ResponseHandler;
@@ -22,9 +23,10 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.ssl.SSLContexts;
-import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.bytelightning.oss.lib.http.HttpAsyncClient.IdleConnectionEvictor;
 
 import javax.net.ssl.SSLContext;
 import java.io.File;
@@ -37,7 +39,10 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -56,12 +61,18 @@ public class HttpClient {
 	}
 	private CloseableHttpClient httpclient;
 	private RequestConfig defaultRequestConfig;
+	private IdleConnectionEvictor connEvictor;
 
 	/**
 	 * One of these setup methods MUST be called after construction and before use of this object.
 	 */
 	public void setup(boolean includeHttps, List<Header> defaultHdrs) throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
-		setup(includeHttps ? SSLContexts.custom().loadTrustMaterial((TrustStrategy) (chain, authType) -> true).build() : null, defaultHdrs);
+		setup(includeHttps ? SSLContexts.custom().loadTrustMaterial(new TrustStrategy() {
+			@Override
+			public boolean isTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+				return true;
+			}
+		}).build() : null, defaultHdrs);
 	}
 
 	/**
@@ -106,6 +117,8 @@ public class HttpClient {
 		httpclient = buildClient(clientBuilder);
 		if (httpclient == null)
 			logger.error("Failed to build the HttpClient");
+
+		connEvictor.start();
 	}
 
 	protected RegistryBuilder<ConnectionSocketFactory> createSocketFactoryBuilder(HttpClientBuilder clientBuilder, SSLContext sslcontext) {
@@ -206,23 +219,25 @@ public class HttpClient {
 	}
 
 	/**
-	 * Send the speccified HTTP HEAD request and return the response as a String.
+	 * Send the specified HTTP HEAD request and return the response as a String.
 	 */
-	@SuppressWarnings("Duplicates")
 	public void head(HttpHead httphead) throws IOException {
 		ResponseHandler<Void> responseHandler = new ResponseHandler<Void>() {
-			StatusLine status = response.getStatusLine();
-			int statusCode = status.getStatusCode();
-			if (statusCode >= 200 && statusCode < 300)
-				return null;
-			else
-				throw new HttpResponseException(statusCode, status.getReasonPhrase());
+			@Override
+			public Void handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
+				StatusLine status = response.getStatusLine();
+				int statusCode = status.getStatusCode();
+				if (statusCode >= 200 && statusCode < 300)
+					return null;
+				else
+					throw new HttpResponseException(statusCode, status.getReasonPhrase());
+			}
 		};
 		head(httphead, responseHandler);
 	}
 
 	/**
-	 * Send the speccified HTTP HEAD request and invoke the supplied handler to process the response as the indicated type.
+	 * Send the specified HTTP HEAD request and invoke the supplied handler to process the response as the indicated type.
 	 */
 	public <T> void head(HttpHead httphead, ResponseHandler<? extends T> responseHandler) throws IOException {
 		execute(httphead, responseHandler);
@@ -257,23 +272,14 @@ public class HttpClient {
 	}
 
 	/**
-	 * Send the speccified HTTP GET request and return the response as a String.
+	 * Send the specified HTTP GET request and return the response as a String.
 	 */
 	public String get(HttpGet httpget) throws IOException {
-		ResponseHandler<String> responseHandler = response -> {
-			StatusLine status = response.getStatusLine();
-			int statusCode = status.getStatusCode();
-			if (statusCode >= 200 && statusCode < 300) {
-				HttpEntity entity = response.getEntity();
-				return entity != null ? EntityUtils.toString(entity) : null;
-			} else
-				throw new HttpResponseException(statusCode, status.getReasonPhrase());
-		};
-		return get(httpget, responseHandler);
+		return get(httpget, new StringResponseHandler());
 	}
 
 	/**
-	 * Send the speccified HTTP GET request and invoke the supplied handler to process the response as the indicated type.
+	 * Send the specified HTTP GET request and invoke the supplied handler to process the response as the indicated type.
 	 */
 	public <T> T get(HttpGet httpget, ResponseHandler<? extends T> responseHandler) throws IOException {
 		return execute(httpget, responseHandler);
@@ -324,22 +330,14 @@ public class HttpClient {
 	}
 
 	/**
-	 * Send the speccified HTTP POST request and return the response as a String.
+	 * Send the specified HTTP POST request and return the response as a String.
 	 */
 	public String post(HttpPost httpPost) throws IOException {
-		return post(httpPost, response -> {
-			StatusLine status = response.getStatusLine();
-			int statusCode = status.getStatusCode();
-			if (statusCode >= 200 && statusCode < 300) {
-				HttpEntity rsp = response.getEntity();
-				return rsp != null ? EntityUtils.toString(rsp) : null;
-			} else
-				throw new HttpResponseException(statusCode, status.getReasonPhrase());
-		});
+		return post(httpPost, new StringResponseHandler());
 	}
 
 	/**
-	 * Send the speccified HTTP POST request and invoke the supplied handler to process the response as the indicated type.
+	 * Send the specified HTTP POST request and invoke the supplied handler to process the response as the indicated type.
 	 */
 	public <T> T post(HttpPost httpPost, ResponseHandler<? extends T> responseHandler) throws IOException {
 		return execute(httpPost, responseHandler);
@@ -409,24 +407,52 @@ public class HttpClient {
 	}
 
 	/**
-	 * Send the speccified HTTP PUT request and return the response as a String.
+	 * Send the specified HTTP PUT request and return the response as a String.
 	 */
 	public String put(HttpPut httpPut) throws IOException {
-		return put(httpPut, response -> {
-			StatusLine status = response.getStatusLine();
-			int statusCode = status.getStatusCode();
-			if (statusCode >= 200 && statusCode < 300) {
-				HttpEntity rsp = response.getEntity();
-				return rsp != null ? EntityUtils.toString(rsp) : null;
-			} else
-				throw new HttpResponseException(statusCode, status.getReasonPhrase());
-		});
+		return put(httpPut, new StringResponseHandler());
 	}
 
 	/**
-	 * Send the speccified HTTP PUT request and invoke the supplied handler to process the response as the indicated type.
+	 * Send the specified HTTP PUT request and invoke the supplied handler to process the response as the indicated type.
 	 */
 	public <T> T put(HttpPut httpPut, ResponseHandler<? extends T> responseHandler) throws IOException {
 		return execute(httpPut, responseHandler);
+	}
+
+	/**
+	 * Helper to evict idle connections out of a connection pool.
+	 */
+	public static class IdleConnectionEvictor extends Thread {
+		public IdleConnectionEvictor(HttpClientConnectionManager connMgr) {
+			super();
+			this.connMgr = connMgr;
+		}
+		private volatile boolean shutdown;
+		private final HttpClientConnectionManager connMgr;
+
+		@Override
+		public void run() {
+			try {
+				while (!shutdown) {
+					synchronized (this) {
+						wait(5000);
+						// Close expired connections
+						connMgr.closeExpiredConnections();
+						// Optionally, close connections that have been idle longer than 5 sec
+						connMgr.closeIdleConnections(5, TimeUnit.SECONDS);
+					}
+				}
+			} catch (InterruptedException ex) {
+				// terminate
+			}
+		}
+
+		public void shutdown() {
+			shutdown = true;
+			synchronized (this) {
+				notifyAll();
+			}
+		}
 	}
 }
