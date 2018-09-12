@@ -1,4 +1,4 @@
 /**
- * Utilities to make JDK 1.6 Rhino JavaScript engine a little more friendly.
+ * Utilities to make Javascript handling in Java a little easier.
  */
 package com.bytelightning.oss.lib.js;

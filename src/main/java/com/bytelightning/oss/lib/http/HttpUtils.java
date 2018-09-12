@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.TimeZone;
 
 import com.bytelightning.oss.lib.ssl.SSLUtils;
@@ -56,5 +57,44 @@ public class HttpUtils extends SSLUtils {
 		SimpleDateFormat f = new SimpleDateFormat(HTTP_DATE_FORMAT);
 		f.setTimeZone(GMT_TZ);
 		return f;
+	}
+	
+	/**
+	 * Convenient lookup for the Local time zone.
+	 */
+	public static final TimeZone LOCAL_TZ = TimeZone.getDefault();
+
+	/**
+	 * HTTP spec says dates must be in GMT time, since any date we create will be in local time, convert the date to be offset back to GMT.
+	 * @param date
+	 */
+	public static Date AdjustLocalDateToGMT(Date date) {
+		Date ret = new Date(date.getTime() - LOCAL_TZ.getRawOffset());
+		// if we are now in DST, back off by the delta. Note that we are checking the GMT date, this is the KEY.
+		if (LOCAL_TZ.inDaylightTime(ret)) {
+			Date dstDate = new Date(ret.getTime() - LOCAL_TZ.getDSTSavings());
+			// check to make sure we have not crossed back into standard time
+			// this happens when we are on the cusp of DST (7pm the day before the change for PDT)
+			if (LOCAL_TZ.inDaylightTime(dstDate))
+				ret = dstDate;
+		}
+		return ret;
+	}
+
+	/**
+	 * HTTP spec says dates must be in GMT time, since any date we receive will be in GMT time, convert the date to be offset back to local time.
+	 * @param date
+	 */
+	public static Date AdjustGMTToLocalDate(Date date) {
+		Date ret = new Date(date.getTime() + LOCAL_TZ.getRawOffset());
+		// if we are now in DST, back off by the delta. Note that we are checking the GMT date, this is the KEY.
+		if (LOCAL_TZ.inDaylightTime(ret)) {
+			Date dstDate = new Date(ret.getTime() + LOCAL_TZ.getDSTSavings());
+			// check to make sure we have not crossed back into standard time
+			// this happens when we are on the cusp of DST (7pm the day before the change for PDT)
+			if (LOCAL_TZ.inDaylightTime(dstDate))
+				ret = dstDate;
+		}
+		return ret;
 	}
 }
