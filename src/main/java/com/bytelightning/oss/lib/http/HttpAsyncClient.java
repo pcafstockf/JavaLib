@@ -200,6 +200,7 @@ public class HttpAsyncClient {
 	/**
 	 * Clean up the client when it is disposed.
 	 */
+	@PreDestroy
 	public void teardown() throws IOException {
 		if (connEvictor != null)
 			connEvictor.shutdown();

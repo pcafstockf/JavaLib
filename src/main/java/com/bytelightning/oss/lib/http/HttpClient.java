@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import com.bytelightning.oss.lib.http.HttpAsyncClient.IdleConnectionEvictor;
 
+import javax.annotation.PreDestroy;
 import javax.net.ssl.SSLContext;
 import java.io.File;
 import java.io.FileInputStream;
@@ -114,6 +115,8 @@ public class HttpClient {
 		if (cookieStore != null)
 			clientBuilder.setDefaultCookieStore(cookieStore);
 
+		connEvictor = new IdleConnectionEvictor(connManager);
+		
 		httpclient = buildClient(clientBuilder);
 		if (httpclient == null)
 			logger.error("Failed to build the HttpClient");
@@ -168,7 +171,10 @@ public class HttpClient {
 	/**
 	 * Clean up the client when it is disposed.
 	 */
+	@PreDestroy
 	public void teardown() throws IOException {
+		if (connEvictor != null)
+			connEvictor.shutdown();
 		if (httpclient != null)
 			httpclient.close();
 	}
