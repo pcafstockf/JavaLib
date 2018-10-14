@@ -2,7 +2,6 @@ package com.bytelightning.oss.lib.sio;
 // This is a lift from https://github.com/apache/qpid-broker-j/blob/master/broker-plugins/management-http/src/main/java/org/apache/qpid/server/management/plugin/GunzipOutputStream.java
 // It's been modified to be JDK 1.6 compatible, but is just to useful not to be easily accessible in my toolbox.
 
-// package com.bytelightning.oss.lib.sio;
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +34,9 @@ import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterOutputStream;
 
+/**
+ * Take deflated (compressed) data and inflate  (decompress) it to the underlying OutputStream.
+ */
 public class GunzipOutputStream extends InflaterOutputStream
 {
     private final GZIPHeader _header = new GZIPHeader();

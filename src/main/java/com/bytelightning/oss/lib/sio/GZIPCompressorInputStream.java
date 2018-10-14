@@ -1,6 +1,6 @@
 package com.bytelightning.oss.lib.sio;
-//This is a lift from https://github.com/apache/qpid-broker-j/blob/master/broker-plugins/management-http/src/main/java/org/apache/qpid/server/management/plugin/GunzipOutputStream.java
-//It's been modified to be JDK 1.6 compatible, but is just to useful not to be easily accessible in my toolbox.
+//This is a lift from https://github.com/mulesoft/mule/blob/mule-4.x/core/src/main/java/org/mule/runtime/core/internal/transformer/compression/GZIPCompressorInputStream.java
+//No changes have been made.  But, it's just to useful not to be easily accessible in my toolbox.
 
 /*
  * Copyright (c) MuleSoft, Inc.  All rights reserved.  http://www.mulesoft.com
